@@ -1,0 +1,148 @@
+#include<iostream>
+using namespace std;
+
+unsigned int iv[] = { 0x7380166f, 0x4914b2b9, 0x172442d7, 0xda8a0600,
+0xa96f30bc, 0x163138aa, 0xe38dee4d, 0xb0fb0e4e };
+
+unsigned int* SM3fill(unsigned int* ctxt,unsigned int lenth,unsigned int* message) {
+	unsigned int n = lenth / 512;
+	unsigned int m = lenth % 512;
+	unsigned int k = m % 32;
+	unsigned int j = m / 32;
+
+	for (int i = 0; i < n * 16+j; i++)
+		ctxt[i] = message[i];
+	ctxt[n * 16 + j] = (message[n * 16 + j] << (32 - k)) + pow(2, 31 - k);
+	for (int i = n * 16 + j + 1; i < (n + 1) * 16; i++)
+		ctxt[i] = 0;
+	ctxt[(n + 1) * 16 - 1] = lenth;
+	return ctxt;
+}
+
+unsigned int left(unsigned int input, int x)
+{
+	input = (input << x) | (input >> (32 - x));
+	return input;
+}
+
+unsigned int P0(unsigned int x)
+{
+	unsigned int re = x ^ left(x, 9) ^ left(x, 17);
+	return re;
+}
+
+int P1(unsigned int x,unsigned int *re)
+{
+	*re = x ^ left(x,15) ^ left(x,23);
+	return 0;
+}
+
+unsigned int FF(int j,unsigned int x,unsigned int y,unsigned int z)
+{
+	unsigned int re;
+	if (j > 15)
+		re = (x & y) | (x & z) | (y & z);
+	else
+		re = x ^ y ^ z;
+
+	return re;
+}
+
+unsigned int GG(int j, unsigned int x,unsigned int y,unsigned int z)
+{
+	unsigned int re;
+	if (j > 15)
+		re = (x & y) | ((~x) & z);
+	else
+		re = x ^ y ^ z;
+
+	return re;
+}
+
+int extend(unsigned int* w_,unsigned int *w, unsigned int *ctx)
+{
+	unsigned int temp;
+	for (int i = 0; i < 16; i++)
+		w[i] = ctx[i];
+	for (int j = 16; j < 68; j++)
+	{
+		P1(w[j - 16] ^ w[j - 9] ^ left(w[j-3],15), &temp);
+		w[j] = temp ^ left(w[j-13],7) ^ w[j - 6];
+	}
+	for (int j = 0; j < 64; j++)
+		w_[j] = w[j] ^ w[j + 4];
+
+	return 0;
+}
+int CF(unsigned int* w,unsigned int* w_,unsigned int* v, int j)
+{
+	unsigned int a = v[0], b = v[1], c = v[2], d = v[3],
+		e = v[4], f = v[5], g = v[6], h = v[7];
+	unsigned int ss1, ss2, tt1, tt2, tj;
+	
+	if (j <= 15)
+		tj = 0x79cc4519;
+	else
+		tj = 0x7a879d8a;
+	ss1 = left((left(a, 12) + e + left(tj, j)), 7);
+	ss2 = ss1 ^ left(a, 12);
+	tt1 = FF(j, a, b, c) + d + ss2 + w_[j];
+	tt2 = GG(j, e, f, g) + h + ss1 + w[j];
+	d = c;
+	c = left(b, 9);
+	b = a;
+	a = tt1;
+	h = g;
+	g = left(f, 19);
+	f = e;
+	e = P0(tt2);
+
+	v[0] = a; v[1] = b; v[2] = c; v[3] = d;
+	v[4] = e; v[5] = f; v[6] = g; v[7] = h;
+
+	return 0;
+}
+
+int hash_sm3(unsigned int* ctx, int lenth,unsigned int*digest)
+{
+	int i, j, n, k;
+	unsigned int * result, w_[64], w[68];
+	unsigned int v[8], temp[8];
+
+	ctx[0] = 0x616263;
+	n = lenth / 512 + 1;
+	result = new unsigned int[n * 16];
+	for (i = 0; i < 8; i++)
+		v[i] = iv[i];
+
+	SM3fill(result, 24, ctx);
+	extend(w_, w, result);
+
+	for (i = 0; i < n; i++)
+	{
+		for (j = 0; j < 8; j++)
+			temp[j] = v[j];
+		for (j = 0; j < 64; j++)
+			CF(w, w_, v, j);
+		for (j = 0; j < 8; j++)
+			digest[j] = temp[j] ^ v[j];
+	}
+
+	return 0;
+}
+
+int main()
+{
+	int lenth;
+	unsigned int* ctx, * digest;
+
+	lenth = 24;
+	ctx = new unsigned int[1];
+	digest = new unsigned int[8];
+	ctx[0] = 0x616263;
+	hash_sm3(ctx, lenth,digest);
+	for (int i = 0; i < 8; i++)
+		cout << hex << digest[i];
+
+	return 0;
+}
