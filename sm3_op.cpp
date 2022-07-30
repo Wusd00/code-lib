@@ -109,13 +109,12 @@ int hash_sm3(unsigned int* ctx, int lenth,unsigned int*digest)
 	unsigned int * result, w_[64], w[68];
 	unsigned int v[8], temp[8];
 
-	ctx[0] = 0x616263;
 	n = lenth / 512 + 1;
 	result = new unsigned int[n * 16];
 	for (i = 0; i < 8; i++)
 		v[i] = iv[i];
 
-	SM3fill(result, 24, ctx);
+	SM3fill(result, lenth, ctx);
 	extend(w_, w, result);
 
 	for (i = 0; i < n; i++)
